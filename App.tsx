@@ -443,9 +443,9 @@ export default function App() {
       <div className="w-96 flex flex-col border-r border-gray-800 bg-neutral-950">
         <div className="p-6 border-b border-gray-800">
           <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent mb-2">
-            NeuroForge 3D
+            DreamMesh
           </h1>
-          <p className="text-xs text-gray-500">Gemini 3.0 Pro // Three.js // Autonomous Loop</p>
+          <p className="text-xs text-gray-500">Generate 3D models from text prompts.</p>
         </div>
 
         <div className="p-6 space-y-4">
