@@ -24,7 +24,7 @@ const getAi = (): GoogleGenAI => {
   return ai;
 };
 
-const MODEL_LOGIC = "gemini-3-pro-preview";
+// Visual QC is always fast/cheap using Flash
 const MODEL_VISION = "gemini-2.5-flash";
 
 /**
@@ -62,7 +62,7 @@ const formatImagesForPrompt = (b64Images: string[]) => {
 /**
  * Phase 1: Planning and Decomposition
  */
-export const generateBuildPlan = async (userPrompt: string): Promise<BuildPlan> => {
+export const generateBuildPlan = async (userPrompt: string, modelId: string): Promise<BuildPlan> => {
   const systemInstruction = `
     You are a Senior 3D Graphics Architect. 
     Your goal is to decompose a user's request for a 3D object/scene into a structured build plan.
@@ -97,7 +97,7 @@ export const generateBuildPlan = async (userPrompt: string): Promise<BuildPlan> 
   };
 
   const response = await getAi().models.generateContent({
-    model: MODEL_LOGIC,
+    model: modelId,
     contents: userPrompt,
     config: {
       systemInstruction,
@@ -117,9 +117,10 @@ export const generateBuildPlan = async (userPrompt: string): Promise<BuildPlan> 
 export const generateComponentCode = async (
   componentName: string, 
   description: string, 
-  previousCode?: string, 
-  errorContext?: string,
-  contextImages: string[] = []
+  previousCode: string | undefined, 
+  errorContext: string | undefined,
+  contextImages: string[] = [],
+  modelId: string
 ): Promise<string> => {
   const systemInstruction = `
     You are an autonomous THREE.js Code Generator.
@@ -151,7 +152,7 @@ export const generateComponentCode = async (
   }
 
   const response = await getAi().models.generateContent({
-    model: MODEL_LOGIC,
+    model: modelId,
     contents: { parts },
     config: {
       systemInstruction,
@@ -213,8 +214,9 @@ export const performVisualQC = async (
     contentParts.push(...formatImagesForPrompt(contextImages));
   }
 
+  // Use Vision model (Flash) for speed and cost efficiency in QC
   const response = await getAi().models.generateContent({
-    model: MODEL_VISION,
+    model: MODEL_VISION, 
     contents: {
       parts: contentParts
     },
@@ -237,8 +239,9 @@ export const generateAttachmentCode = async (
   partName: string,
   partDescription: string,
   currentAssemblyImages: string[],
-  previousCode?: string, 
-  errorContext?: string
+  previousCode: string | undefined, 
+  errorContext: string | undefined,
+  modelId: string
 ): Promise<string> => {
    const systemInstruction = `
     You are an expert 3D Assembly Engineer specializing in THREE.js.
@@ -298,7 +301,7 @@ export const generateAttachmentCode = async (
   ];
 
   const response = await getAi().models.generateContent({
-    model: MODEL_LOGIC,
+    model: modelId,
     contents: { parts },
     config: {
       systemInstruction,

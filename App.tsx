@@ -16,6 +16,14 @@ const IconEye = () => <svg className="w-5 h-5" fill="none" stroke="currentColor"
 const IconCheck = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>;
 const IconAlert = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>;
 const IconDownload = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>;
+const IconLock = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>;
+const IconUnlock = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>;
+
+const MODELS = [
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', dailyLimit: 10 }, // 10 uses daily
+  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', dailyLimit: 3 },
+  { id: 'gemini-3-pro-preview', name: 'Gemini 3.0 Pro (Preview)', dailyLimit: 1 },
+];
 
 export default function App() {
   // --- State ---
@@ -27,10 +35,48 @@ export default function App() {
   const [currentProcessingId, setCurrentProcessingId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   
+  // --- Model Selection & Limits State ---
+  const [selectedModelId, setSelectedModelId] = useState(MODELS[0].id);
+  const [usage, setUsage] = useState<Record<string, number>>({});
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [showUnlockInput, setShowUnlockInput] = useState(false);
+  const [unlockCode, setUnlockCode] = useState("");
+
   const threeStageRef = useRef<ThreeStageHandle>(null);
   
   // Stores valid THREE objects for final assembly
   const validatedObjectsRef = useRef<Record<string, THREE.Object3D>>({});
+
+  // --- Initialization ---
+  useEffect(() => {
+    // Load usage limits from local storage
+    const today = new Date().toDateString();
+    const storedUsage = localStorage.getItem('dm_usage');
+    if (storedUsage) {
+      const parsed = JSON.parse(storedUsage);
+      if (parsed.date === today) {
+        setUsage(parsed.counts);
+      } else {
+        // Reset daily counts if date changed
+        localStorage.setItem('dm_usage', JSON.stringify({ date: today, counts: {} }));
+      }
+    }
+    
+    const unlocked = localStorage.getItem('dm_unlocked') === 'true';
+    setIsUnlocked(unlocked);
+  }, []);
+
+  const handleUnlock = () => {
+    if (unlockCode === 'PS71steg@') {
+      setIsUnlocked(true);
+      localStorage.setItem('dm_unlocked', 'true');
+      setShowUnlockInput(false);
+      setUnlockCode("");
+      addLog("Premium Mode Unlocked: Daily limits removed.", 'success');
+    } else {
+      addLog("Invalid Unlock Code.", 'error');
+    }
+  };
 
   // --- Logging ---
   const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
@@ -113,6 +159,23 @@ export default function App() {
 
   const runPipeline = async () => {
     if (!prompt.trim()) return;
+
+    // Limit Check
+    const modelDef = MODELS.find(m => m.id === selectedModelId);
+    const currentCount = usage[selectedModelId] || 0;
+    
+    if (!isUnlocked && modelDef && modelDef.dailyLimit !== -1 && currentCount >= modelDef.dailyLimit) {
+        addLog(`Daily limit reached for ${modelDef.name}. Please switch models or unlock premium.`, 'error');
+        return;
+    }
+
+    // Increment Limit
+    if (!isUnlocked && modelDef && modelDef.dailyLimit !== -1) {
+        const newUsage = { ...usage, [selectedModelId]: currentCount + 1 };
+        setUsage(newUsage);
+        localStorage.setItem('dm_usage', JSON.stringify({ date: new Date().toDateString(), counts: newUsage }));
+    }
+
     setPhase(AppPhase.PLANNING);
     setLogs([]);
     setComponents({});
@@ -121,8 +184,8 @@ export default function App() {
 
     try {
       // 1. Planning
-      addLog("Initiating Gemini 3.0 Pro... Generating Build Plan...", 'info');
-      const plan = await generateBuildPlan(prompt);
+      addLog(`Initiating ${modelDef?.name}... Generating Build Plan...`, 'info');
+      const plan = await generateBuildPlan(prompt, selectedModelId);
       setBuildPlan(plan);
       addLog(`Plan generated: ${plan.overview}`, 'success');
       
@@ -151,7 +214,8 @@ export default function App() {
         const processedArtifact = await processComponent(
           component.id, 
           pipelineComponents[component.id], 
-          collectedContextImages
+          collectedContextImages,
+          selectedModelId
         );
         // Update local tracker
         pipelineComponents[component.id] = processedArtifact;
@@ -214,14 +278,14 @@ export default function App() {
         while (!attached && retries < 4) {
           try {
             // 1. Generate Attachment Code
-            // We show the AI the current assembly state + the new part to add
             const code = await generateAttachmentCode(
               plan.overview,
               partComp.name,
               partComp.description,
               currentAssemblySnapshots,
               undefined, // We don't pass old code here to force fresh thinking, but we pass error context
-              errorContext
+              errorContext,
+              selectedModelId
             );
 
             // 2. Execute Attachment (on a test clone first to avoid corrupting main state)
@@ -245,17 +309,8 @@ export default function App() {
               addLog(`${partComp.name} Attached Successfully.`, 'success');
               
               // Commit changes
-              rootObject.copy(testRoot, true); // Copy structure
-              // Note: recursive copy might be tricky with ThreeJS, safer to just swap the reference for the next loop if we were tracking it differently.
-              // Since we are clearing scene and adding back, let's just update our local reference logic.
-              // Actually, the easiest way is to just clear rootObject's children and copy testRoot's children, 
-              // OR just set rootObject = testRoot for the next iteration.
-              // However, rootObject is a const reference. Let's use structure mutation.
-              
-              // Better approach: The Scene is the truth.
-              // We validated testRoot. Let's make it the new source of truth.
-              // But we need to keep 'rootObject' variable updated for the next loop iteration clone.
-              rootObject.children = [...testRoot.children]; // Transfer ownership of children (including the new part)
+              // We transfer children ownership to the main rootObject manually to persist the tree structure
+              rootObject.children = [...testRoot.children];
               rootObject.position.copy(testRoot.position);
               rootObject.rotation.copy(testRoot.rotation);
               rootObject.scale.copy(testRoot.scale);
@@ -297,7 +352,8 @@ export default function App() {
   const processComponent = async (
     id: string, 
     artifact: ComponentArtifact, 
-    contextImages: string[]
+    contextImages: string[],
+    modelId: string
   ): Promise<ComponentArtifact> => {
     setCurrentProcessingId(id);
     let currentArtifact: ComponentArtifact = { ...artifact };
@@ -319,7 +375,8 @@ export default function App() {
             currentArtifact.plan.description,
             currentArtifact.code,
             errorContext,
-            contextImages
+            contextImages,
+            modelId
           );
           
           currentArtifact.code = code;
@@ -440,7 +497,7 @@ export default function App() {
   return (
     <div className="flex h-screen bg-neutral-900 text-white font-sans">
       {/* Sidebar: Controls & Logs */}
-      <div className="w-96 flex flex-col border-r border-gray-800 bg-neutral-950">
+      <div className="w-96 flex flex-col border-r border-gray-800 bg-neutral-950 z-10">
         <div className="p-6 border-b border-gray-800">
           <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent mb-2">
             DreamMesh
@@ -448,9 +505,10 @@ export default function App() {
           <p className="text-xs text-gray-500">Generate 3D models from text prompts.</p>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-6 flex-1 overflow-y-auto">
+          {/* Prompt Input */}
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">Prompt</label>
+            <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Prompt</label>
             <textarea 
               className="w-full bg-gray-900 border border-gray-700 rounded p-3 text-sm focus:ring-1 focus:ring-blue-500 outline-none resize-none"
               rows={3}
@@ -459,6 +517,8 @@ export default function App() {
               disabled={phase !== AppPhase.IDLE && phase !== AppPhase.COMPLETED && phase !== AppPhase.ERROR}
             />
           </div>
+
+          {/* Generate Button */}
           <button
             onClick={runPipeline}
             disabled={phase !== AppPhase.IDLE && phase !== AppPhase.COMPLETED && phase !== AppPhase.ERROR}
@@ -470,10 +530,86 @@ export default function App() {
             {phase === AppPhase.IDLE ? 'INITIALIZE GENERATION' : phase === AppPhase.ERROR || phase === AppPhase.COMPLETED ? 'RESET & REGENERATE' : 'PROCESSING...'}
           </button>
 
-          {/* Export Controls - Only show when valid model exists */}
+          {/* Unlock / Secret Code */}
+          {!isUnlocked && (
+            <div className="pt-4 border-t border-gray-800">
+               {!showUnlockInput ? (
+                 <button 
+                   onClick={() => setShowUnlockInput(true)} 
+                   className="text-[10px] text-gray-600 hover:text-gray-400 flex items-center gap-1"
+                 >
+                   <IconLock /> Have a code?
+                 </button>
+               ) : (
+                 <div className="flex gap-2">
+                    <input 
+                      type="password" 
+                      className="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-white focus:border-blue-500 outline-none"
+                      placeholder="Enter secret key..."
+                      value={unlockCode}
+                      onChange={(e) => setUnlockCode(e.target.value)}
+                    />
+                    <button 
+                      onClick={handleUnlock}
+                      className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs border border-gray-700 text-gray-300"
+                    >
+                      Unlock
+                    </button>
+                 </div>
+               )}
+            </div>
+          )}
+
+          {/* Model Selection - Moved to Bottom */}
+          <div className="pt-4 border-t border-gray-800">
+             <div className="flex justify-between items-center mb-2">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Model Tier</label>
+                {isUnlocked && <span className="text-[10px] text-yellow-400 flex items-center gap-1"><IconUnlock /> UNLOCKED</span>}
+             </div>
+             <div className="space-y-2">
+                {MODELS.map(model => {
+                  const count = usage[model.id] || 0;
+                  const isLimitReached = !isUnlocked && model.dailyLimit !== -1 && count >= model.dailyLimit;
+                  
+                  return (
+                    <label 
+                      key={model.id} 
+                      className={`block p-3 rounded border cursor-pointer transition-all ${
+                        selectedModelId === model.id 
+                          ? 'bg-blue-900/20 border-blue-500/50' 
+                          : 'bg-gray-900 border-gray-800 hover:border-gray-700'
+                      } ${isLimitReached ? 'opacity-50' : ''}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <input 
+                          type="radio" 
+                          name="model_select"
+                          className="hidden"
+                          checked={selectedModelId === model.id}
+                          onChange={() => setSelectedModelId(model.id)}
+                          disabled={isLimitReached}
+                        />
+                        <div className={`w-3 h-3 rounded-full border ${selectedModelId === model.id ? 'bg-blue-500 border-blue-500' : 'border-gray-600'}`}></div>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-gray-200">{model.name}</div>
+                          <div className="text-[10px] text-gray-500 flex justify-between">
+                             <span>Daily Usage:</span>
+                             <span className={`${isLimitReached ? 'text-red-400' : 'text-gray-400'}`}>
+                               {isUnlocked ? '∞' : `${count} / ${model.dailyLimit === -1 ? '∞' : model.dailyLimit}`}
+                             </span>
+                          </div>
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+             </div>
+          </div>
+
+          {/* Export Controls */}
           {phase === AppPhase.COMPLETED && (
             <div className="pt-4 border-t border-gray-800">
-              <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Export Model</label>
+              <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Export Model</label>
               <div className="grid grid-cols-3 gap-2">
                 <button 
                   onClick={() => handleExport('glb')} 
@@ -502,7 +638,7 @@ export default function App() {
         </div>
 
         {/* Progress Indicator */}
-        <div className="px-6 py-2 border-t border-gray-800">
+        <div className="px-6 py-2 border-t border-gray-800 bg-neutral-950">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-mono uppercase text-gray-400">System Status</span>
             <span className={`text-xs font-mono font-bold ${phase === AppPhase.ERROR ? 'text-red-500' : 'text-blue-400'}`}>
@@ -521,8 +657,8 @@ export default function App() {
         </div>
 
         {/* Logs Console */}
-        <div className="flex-1 overflow-hidden flex flex-col border-t border-gray-800">
-          <div className="p-2 bg-gray-900 text-xs font-mono text-gray-500">CONSOLE OUTPUT</div>
+        <div className="h-48 overflow-hidden flex flex-col border-t border-gray-800 bg-black">
+          <div className="p-2 bg-gray-900 text-xs font-mono text-gray-500 border-b border-gray-800">CONSOLE OUTPUT</div>
           <div className="flex-1 overflow-y-auto p-4 space-y-2 font-mono text-xs">
             {logs.map((log, i) => (
               <div key={i} className={`flex gap-2 ${
@@ -546,7 +682,7 @@ export default function App() {
           
           {/* Overlay: Current Task */}
           {phase !== AppPhase.IDLE && phase !== AppPhase.COMPLETED && (
-             <div className="absolute top-4 left-4 bg-black/70 backdrop-blur border border-gray-800 p-4 rounded text-sm max-w-md">
+             <div className="absolute top-4 left-4 bg-black/70 backdrop-blur border border-gray-800 p-4 rounded text-sm max-w-md z-20">
                <h3 className="text-white font-bold mb-1 flex items-center gap-2">
                  {phase === AppPhase.QC_ANALYSIS ? <IconEye /> : <IconBrain />}
                  {phase}
