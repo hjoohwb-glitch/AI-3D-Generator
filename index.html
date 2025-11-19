@@ -27,6 +27,14 @@
 </script>
 </head>
   <body>
+    <script>
+      // Shim for process.env.API_KEY for client-side environments like Vercel
+      // This allows 'services/geminiService.ts' to access the API_KEY as prescribed.
+      window.process = window.process || {};
+      window.process.env = window.process.env || {};
+      // Vercel will substitute the actual API_KEY here during deployment if set
+      window.process.env.API_KEY = '__VERCEL_API_KEY__'; 
+    </script>
     <div id="root"></div>
   </body>
 </html>
