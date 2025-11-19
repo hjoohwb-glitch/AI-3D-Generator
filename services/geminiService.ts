@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { BuildPlan, QCResult } from "../types";
 
@@ -8,16 +7,27 @@ let ai: GoogleGenAI | null = null;
 
 const getAi = (): GoogleGenAI => {
   if (!ai) {
-    // Robust API Key retrieval strategy:
-    // 1. Check process.env (Build-time/Node)
-    // 2. Check window.process shim (Runtime/Browser via index.html)
-    // 3. Use provided fallback test key (User requested failsafe)
+    // Robust API Key retrieval strategy to handle various Vercel/Vite configurations:
+    // 1. Check standard process.env (Node/Build-time)
+    // 2. Check import.meta.env (Modern Vite/ESM)
+    // 3. Check common prefixes used in Vercel (VITE_, NEXT_PUBLIC_)
+    // 4. Check window shim (Runtime/Browser fallback)
+    
+    // @ts-ignore
+    const viteEnv = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env : {};
+    
     const apiKey = process.env.API_KEY || 
+                   process.env.VITE_API_KEY || 
+                   process.env.NEXT_PUBLIC_API_KEY ||
+                   viteEnv.API_KEY ||
+                   viteEnv.VITE_API_KEY ||
                    (typeof window !== 'undefined' ? (window as any).process?.env?.API_KEY : undefined) ||
-                   'AIzaSyBjjiRwQK1ayeHjlHZGWWUOQ06_oaB1mPA';
+                   'FALLBACK_API_KEY';
 
-    if (!apiKey) {
-      throw new Error("Critical: API Key is missing. Please set API_KEY in Vercel Environment Variables.");
+    if (!apiKey || apiKey === 'FALLBACK_API_KEY') {
+      // Note: We allow FALLBACK_API_KEY to proceed so the UI doesn't crash immediately, 
+      // but actual API calls will fail if the user hasn't set a valid key.
+      console.warn("Using Fallback API Key. Please set API_KEY in your environment variables.");
     }
 
     ai = new GoogleGenAI({ apiKey });

@@ -35,7 +35,7 @@
       // IMPORTANT: This ensures the app can read the API Key injected by the build system
       // or provides a safe fallback to prevent crash on initialization.
       // Uses the provided fallback key for testing purposes.
-      window.process.env.API_KEY = window.process.env.API_KEY || 'AIzaSyBjjiRwQK1ayeHjlHZGWWUOQ06_oaB1mPA'; 
+      window.process.env.API_KEY = window.process.env.API_KEY || 'FALLBACK_API_KEY'; 
     </script>
     <div id="root"></div>
     <!-- CRITICAL: This links your HTML to your React code. Required for Vercel/Vite. -->
