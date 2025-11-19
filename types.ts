@@ -1,3 +1,4 @@
+
 export enum AppPhase {
   IDLE = 'IDLE',
   PLANNING = 'PLANNING',
@@ -36,6 +37,7 @@ export interface ComponentArtifact {
   retryCount: number;
   qcHistory: QCResult[];
   errorLogs: string[];
+  images?: string[];
 }
 
 export interface LogEntry {

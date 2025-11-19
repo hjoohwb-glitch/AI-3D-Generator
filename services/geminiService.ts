@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { BuildPlan, QCResult } from "../types";
 
@@ -239,6 +240,7 @@ export const generateAttachmentCode = async (
   partName: string,
   partDescription: string,
   currentAssemblyImages: string[],
+  partImages: string[],
   previousCode: string | undefined, 
   errorContext: string | undefined,
   modelId: string
@@ -287,6 +289,11 @@ export const generateAttachmentCode = async (
     Assembly Plan: ${overview}
     Task: Attach "${partName}" (${partDescription}) to the current model.
     
+    CRITICAL: Look at the 'PART TO ATTACH' images provided below. 
+    - Determine if the 'part' object is ALREADY a composite (e.g. a single mesh containing a Pair of Legs).
+    - If it is ALREADY a pair/group, DO NOT clone it multiple times. Just position it. 
+    - If it is a single item (e.g. one wheel) and the plan requires multiple (e.g. 4 wheels), YOU MUST clone it.
+    
     Write the 'attach' function.
   `;
 
@@ -297,6 +304,8 @@ export const generateAttachmentCode = async (
   const parts: any[] = [
     { text: "CURRENT ASSEMBLY STATE (Visual Context):" },
     ...formatImagesForPrompt(currentAssemblyImages),
+    { text: "PART TO ATTACH (Visual Context - 6 angles):" },
+    ...formatImagesForPrompt(partImages),
     { text: prompt }
   ];
 

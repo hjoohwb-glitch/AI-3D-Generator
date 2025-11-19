@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import * as THREE from 'three';
 import { AppPhase, BuildPlan, ComponentArtifact, LogEntry, ComponentPlan } from './types';
@@ -198,7 +199,8 @@ export default function App() {
           status: 'PENDING',
           retryCount: 0,
           qcHistory: [],
-          errorLogs: []
+          errorLogs: [],
+          images: []
         };
       });
       setComponents(initialComponents);
@@ -283,6 +285,7 @@ export default function App() {
               partComp.name,
               partComp.description,
               currentAssemblySnapshots,
+              partArtifact.images || [], // Pass the visual context of the part being attached
               undefined, // We don't pass old code here to force fresh thinking, but we pass error context
               errorContext,
               selectedModelId
@@ -403,6 +406,9 @@ export default function App() {
           currentArtifact.status = 'VERIFIED';
           verified = true;
           validatedObjectsRef.current[id] = object3d; 
+          
+          // Persist the approved snapshots for assembly context
+          currentArtifact.images = snapshots;
           
           if (snapshots.length > 0) {
              contextImages.push(snapshots[0]);
