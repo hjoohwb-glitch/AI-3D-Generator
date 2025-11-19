@@ -175,15 +175,18 @@ const ThreeStage = forwardRef<ThreeStageHandle, {}>((props, ref) => {
       if (maxDim === 0 || !isFinite(cameraDistance) || cameraDistance < 0.1) cameraDistance = 5;
 
       // 3. Define relative positions based on calculated distance
-      // Use a tiny offset (0.001) for Top/Bottom to prevent LookAt singularity with Up vector
-      const positions = [
-        new THREE.Vector3(0, 0, cameraDistance), // Front
-        new THREE.Vector3(0, 0, -cameraDistance), // Back
-        new THREE.Vector3(0.001, cameraDistance, 0), // Top
-        new THREE.Vector3(0.001, -cameraDistance, 0), // Bottom
-        new THREE.Vector3(cameraDistance, 0, 0), // Right
-        new THREE.Vector3(-cameraDistance, 0, 0), // Left
-      ];
+      // Replaced orthogonal 6 views with 8 isometric corner views for better 3D context
+      const positions: THREE.Vector3[] = [];
+      const signs = [1, -1];
+
+      for (const x of signs) {
+        for (const y of signs) {
+          for (const z of signs) {
+            const dir = new THREE.Vector3(x, y, z).normalize();
+            positions.push(dir.multiplyScalar(cameraDistance));
+          }
+        }
+      }
 
       for (const offset of positions) {
         // Position camera relative to the object's actual center

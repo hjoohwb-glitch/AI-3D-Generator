@@ -179,7 +179,7 @@ export const performVisualQC = async (
     You are a Visual Quality Control Agent for a 3D pipeline.
     Subject: "${componentName}"
     
-    Analyze these 6 viewpoints (Front, Back, Top, Bottom, Left, Right).
+    Analyze these 8 isometric viewpoints captured from the corners of the object's bounding box.
     
     CRITICAL INSTRUCTIONS:
     1. IGNORE SHADOWS: The rendering environment uses directional lighting. Dark areas, black shadows, or gradients are EXPECTED.
@@ -304,7 +304,7 @@ export const generateAttachmentCode = async (
   const parts: any[] = [
     { text: "CURRENT ASSEMBLY STATE (Visual Context):" },
     ...formatImagesForPrompt(currentAssemblyImages),
-    { text: "PART TO ATTACH (Visual Context - 6 angles):" },
+    { text: "PART TO ATTACH (Visual Context - 8 angles):" },
     ...formatImagesForPrompt(partImages),
     { text: prompt }
   ];
@@ -339,7 +339,7 @@ export const performAssemblyQC = async (
     
     ACTION PERFORMED: Added component "${currentPartName}".
     
-    Analyze the 6 viewpoints provided.
+    Analyze the 8 isometric viewpoints provided.
     
     Task: Verify that "${currentPartName}" is correctly attached to the model.
     
