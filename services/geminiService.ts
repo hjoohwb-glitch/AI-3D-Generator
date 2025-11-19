@@ -257,28 +257,35 @@ export const generateAttachmentCode = async (
     - You must MOVE, ROTATE, and SCALE the 'part' to fit onto the 'root' correctly.
     
     INSTRUCTIONS:
-    1. **Analyze Bounding Boxes**:
+    1. **Preparation**:
+       - Call 'root.updateMatrixWorld()' and 'part.updateMatrixWorld()' to ensure transforms are fresh.
+    
+    2. **Analyze Bounding Boxes**:
        - Use 'new THREE.Box3().setFromObject(root)' to find the dimensions of the assembly.
        - Use 'new THREE.Box3().setFromObject(part)' to find the dimensions of the new part.
        
-    2. **Rescaling**:
+    3. **Rescaling**:
        - Compare the dimensions. Rescale 'part' to a logical size relative to 'root'.
        - Example: If 'part' is a Door, it should fit within the height of the 'root' (House).
        - Apply 'part.scale.setScalar(ratio)'.
 
-    3. **Positioning & Orientation**:
-       - Move 'part' to the correct location on 'root' (e.g., wheels go to the bottom corners).
-       - Rotate 'part' if needed (e.g., wheels need to face outward).
+    4. **Positioning & Orientation (CRITICAL: PREVENT FLOATING PARTS)**:
+       - **Snap to Surface**: You MUST calculate the exact surface position using the bounding box of 'root'.
+         - Example: To place on TOP, set y = rootBox.max.y - (partBox.min.y * part.scale.y).
+         - Example: To place on RIGHT, set x = rootBox.max.x - (partBox.min.x * part.scale.x).
+       - **Avoid Magic Numbers**: Do not guess coordinates like 'position.y = 5'. Always use 'rootBox.max.y' or similar calculations derived from the objects.
+       - **Contact**: The part MUST physically touch or slightly intersect the root. DO NOT leave visible air gaps.
+       - **Orientation**: Rotate 'part' so its correct face aligns with the attachment surface (e.g., wheels flat on ground, headlights facing forward).
     
-    4. **Duplication**:
+    5. **Duplication**:
        - If the part name implies multiple instances (e.g., "Wheels", "Headlights", "Propellers") but 'part' is a single object:
          - CLONE 'part' for each instance needed.
-         - Position each clone correctly.
+         - Position each clone correctly using bounding box logic.
          - Add ALL clones to 'root'.
          - If it's a single item (e.g., "Turret"), just add 'part' to 'root'.
        - **IMPORTANT**: Check the 'PART TO ATTACH' images. If the part is ALREADY a pair (e.g. two legs), TREAT IT AS ONE UNIT. Do not duplicate a pair to make 4 legs unless requested.
     
-    5. **Final Step**:
+    6. **Final Step**:
        - Ensure 'part' (or its clones) is added to 'root' via 'root.add(part)'.
     
     RETURN:
@@ -299,7 +306,7 @@ export const generateAttachmentCode = async (
   `;
 
   if (previousCode && errorContext) {
-    prompt += `\n\nPREVIOUS ATTEMPT FAILED.\nFeedback: ${errorContext}\n\nPrevious Code:\n${previousCode}\n\nFIX THE CODE. \n- Adjust coordinates, scale, or rotation based on the visual feedback.`;
+    prompt += `\n\nPREVIOUS ATTEMPT FAILED.\nFeedback: ${errorContext}\n\nPrevious Code:\n${previousCode}\n\nFIX THE CODE. \n- Adjust coordinates, scale, or rotation based on the visual feedback. \n- ENSURE NO GAP between parts.`;
   }
 
   const parts: any[] = [
@@ -345,14 +352,14 @@ export const performAssemblyQC = async (
     Task: Verify that "${currentPartName}" is correctly attached to the model.
     
     Pass criteria:
-    1. "${currentPartName}" is physically connected to the main body (not floating miles away).
-    2. "${currentPartName}" is scaled appropriately (not microscopic, not 100x too big).
-    3. "${currentPartName}" is oriented correctly (e.g. wheels touch ground, turret on top).
+    1. **CONNECTION**: "${currentPartName}" must physically touch the main model.
+    2. **NO GAPS**: There must be NO visible air gap between the "${currentPartName}" and the main body.
+    3. **SCALE/ORIENT**: Scaled and oriented correctly.
     
     Fail criteria:
-    1. The new part is floating in void.
-    2. The new part is clipping completely inside another part (invisible).
-    3. The new part is drastically incorrectly scaled.
+    1. **FLOATING**: If the part is hovering near the model but not touching it, FAIL immediately.
+    2. **CLIPPING**: If hidden inside.
+    3. **SCALE**: If scale is wrong.
     
     Return JSON.
   `;

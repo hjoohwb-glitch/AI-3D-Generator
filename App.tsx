@@ -22,8 +22,7 @@ const IconUnlock = () => <svg className="w-4 h-4" fill="none" stroke="currentCol
 
 const MODELS = [
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', dailyLimit: 10, desc: 'Fast & simple' },
-  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', dailyLimit: 3, desc: 'Higher quality' },
-  { id: 'gemini-3-pro-preview', name: 'Gemini 3.0 Pro (Preview)', dailyLimit: 1, desc: 'Highest quality & slow' },
+  { id: 'gemini-3-pro-preview', name: 'Gemini 3.0 Pro (Preview)', dailyLimit: 3, desc: 'Highest quality & slow' },
 ];
 
 export default function App() {
