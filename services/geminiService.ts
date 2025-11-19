@@ -1,10 +1,16 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { BuildPlan, QCResult } from "../types";
 
-// Initialize Gemini Client
-// Using gemini-3-pro-preview for complex logic and coding tasks
-// Using gemini-2.5-flash for rapid visual analysis
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Initialize Gemini Client Lazily
+// This prevents immediate crashes on Vercel if process.env.API_KEY is undefined at load time.
+let ai: GoogleGenAI | null = null;
+
+const getAi = (): GoogleGenAI => {
+  if (!ai) {
+    ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  }
+  return ai;
+};
 
 const MODEL_LOGIC = "gemini-3-pro-preview";
 const MODEL_VISION = "gemini-2.5-flash";
@@ -78,7 +84,7 @@ export const generateBuildPlan = async (userPrompt: string): Promise<BuildPlan> 
     required: ["overview", "components"]
   };
 
-  const response = await ai.models.generateContent({
+  const response = await getAi().models.generateContent({
     model: MODEL_LOGIC,
     contents: userPrompt,
     config: {
@@ -132,7 +138,7 @@ export const generateComponentCode = async (
     parts.push(...formatImagesForPrompt(contextImages));
   }
 
-  const response = await ai.models.generateContent({
+  const response = await getAi().models.generateContent({
     model: MODEL_LOGIC,
     contents: { parts },
     config: {
@@ -195,7 +201,7 @@ export const performVisualQC = async (
     contentParts.push(...formatImagesForPrompt(contextImages));
   }
 
-  const response = await ai.models.generateContent({
+  const response = await getAi().models.generateContent({
     model: MODEL_VISION,
     contents: {
       parts: contentParts
@@ -279,7 +285,7 @@ export const generateAttachmentCode = async (
     { text: prompt }
   ];
 
-  const response = await ai.models.generateContent({
+  const response = await getAi().models.generateContent({
     model: MODEL_LOGIC,
     contents: { parts },
     config: {
@@ -336,7 +342,7 @@ export const performAssemblyQC = async (
     required: ["passed", "feedback", "score"]
   };
 
-  const response = await ai.models.generateContent({
+  const response = await getAi().models.generateContent({
     model: MODEL_VISION,
     contents: {
       parts: [...parts, { text: prompt }]
