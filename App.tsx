@@ -276,7 +276,7 @@ export default function App() {
         let retries = 0;
         let errorContext = "";
         
-        while (!attached && retries < 4) {
+        while (!attached && retries < 10) {
           try {
             // 1. Generate Attachment Code
             const code = await generateAttachmentCode(
@@ -361,7 +361,7 @@ export default function App() {
     let currentArtifact: ComponentArtifact = { ...artifact };
     let verified = false;
 
-    while (!verified && currentArtifact.retryCount < 4) {
+    while (!verified && currentArtifact.retryCount < 10) {
       try {
         // A. Generation / Fix
         if (currentArtifact.status === 'PENDING' || currentArtifact.status === 'FAILED') {
