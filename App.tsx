@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import * as THREE from 'three';
 import { AppPhase, BuildPlan, ComponentArtifact, LogEntry, ComponentPlan } from './types';
@@ -24,6 +23,9 @@ const MODELS = [
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', dailyLimit: 10, desc: 'Fast & simple' },
   { id: 'gemini-3-pro-preview', name: 'Gemini 3.0 Pro (Preview)', dailyLimit: 3, desc: 'Highest quality & slow' },
 ];
+
+// Increased max retries to give AI more chances to self-correct
+const MAX_RETRIES = 15;
 
 export default function App() {
   // --- State ---
@@ -276,7 +278,7 @@ export default function App() {
         let retries = 0;
         let errorContext = "";
         
-        while (!attached && retries < 10) {
+        while (!attached && retries < MAX_RETRIES) {
           try {
             // 1. Generate Attachment Code
             const code = await generateAttachmentCode(
@@ -361,7 +363,7 @@ export default function App() {
     let currentArtifact: ComponentArtifact = { ...artifact };
     let verified = false;
 
-    while (!verified && currentArtifact.retryCount < 10) {
+    while (!verified && currentArtifact.retryCount < MAX_RETRIES) {
       try {
         // A. Generation / Fix
         if (currentArtifact.status === 'PENDING' || currentArtifact.status === 'FAILED') {

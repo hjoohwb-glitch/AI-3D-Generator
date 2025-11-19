@@ -8,17 +8,19 @@ let ai: GoogleGenAI | null = null;
 const getAi = (): GoogleGenAI => {
   if (!ai) {
     // Robust API Key retrieval strategy to handle various Vercel/Vite configurations:
-    // 1. Check standard process.env (Node/Build-time)
-    // 2. Check import.meta.env (Modern Vite/ESM)
-    // 3. Check common prefixes used in Vercel (VITE_, NEXT_PUBLIC_)
+    // 1. Check standard NEXT_PUBLIC_ (Vercel Client-Side)
+    // 2. Check standard VITE_ (Vite Client-Side)
+    // 3. Check standard process.env (Node/Build-time)
     // 4. Check window shim (Runtime/Browser fallback)
     
     // @ts-ignore
     const viteEnv = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env : {};
     
-    const apiKey = process.env.API_KEY || 
+    // CRITICAL: We access process.env.NEXT_PUBLIC_API_KEY directly so build tools (Webpack/Vite/Next) 
+    // can replace it with the actual string literal during build.
+    const apiKey = process.env.NEXT_PUBLIC_API_KEY || 
                    process.env.VITE_API_KEY || 
-                   process.env.NEXT_PUBLIC_API_KEY ||
+                   process.env.API_KEY ||
                    viteEnv.API_KEY ||
                    viteEnv.VITE_API_KEY ||
                    (typeof window !== 'undefined' ? (window as any).process?.env?.API_KEY : undefined) ||
@@ -27,7 +29,7 @@ const getAi = (): GoogleGenAI => {
     if (!apiKey || apiKey === 'FALLBACK_API_KEY') {
       // Note: We allow FALLBACK_API_KEY to proceed so the UI doesn't crash immediately, 
       // but actual API calls will fail if the user hasn't set a valid key.
-      console.warn("Using Fallback API Key. Please set API_KEY in your environment variables.");
+      console.warn("Using Fallback API Key. Please set NEXT_PUBLIC_API_KEY or API_KEY in your environment variables.");
     }
 
     ai = new GoogleGenAI({ apiKey });
@@ -280,12 +282,13 @@ export const generateAttachmentCode = async (
        - Apply 'part.scale.setScalar(ratio)'.
 
     4. **Positioning & Orientation (CRITICAL: PREVENT FLOATING PARTS)**:
-       - **Snap to Surface**: You MUST calculate the exact surface position using the bounding box of 'root'.
-         - Example: To place on TOP, set y = rootBox.max.y - (partBox.min.y * part.scale.y).
-         - Example: To place on RIGHT, set x = rootBox.max.x - (partBox.min.x * part.scale.x).
-       - **Avoid Magic Numbers**: Do not guess coordinates like 'position.y = 5'. Always use 'rootBox.max.y' or similar calculations derived from the objects.
-       - **Contact**: The part MUST physically touch or slightly intersect the root. DO NOT leave visible air gaps.
-       - **Orientation**: Rotate 'part' so its correct face aligns with the attachment surface (e.g., wheels flat on ground, headlights facing forward).
+       - **SNAP TO SURFACE**: You MUST calculate the exact surface position using the bounding box values.
+         - To place ON TOP: y = rootBox.max.y - (partBox.min.y * part.scale.y) - 0.01; // Subtract small amount to ensure overlap/contact
+         - To place ON RIGHT: x = rootBox.max.x - (partBox.min.x * part.scale.x) - 0.01;
+         - To place ON LEFT: x = rootBox.min.x - (partBox.max.x * part.scale.x) + 0.01;
+       - **INTERSECTION IS BETTER THAN FLOATING**: It is acceptable for the part to slightly clip into the root (0.01 units) to ensure it is physically connected.
+       - **NO MAGIC NUMBERS**: Do not guess coordinates like 'position.y = 5'. Always use 'rootBox.max.y', 'rootBox.min.z', etc.
+       - **Orientation**: Rotate 'part' so its correct face aligns with the attachment surface.
     
     5. **Duplication**:
        - If the part name implies multiple instances (e.g., "Wheels", "Headlights", "Propellers") but 'part' is a single object:
@@ -316,7 +319,7 @@ export const generateAttachmentCode = async (
   `;
 
   if (previousCode && errorContext) {
-    prompt += `\n\nPREVIOUS ATTEMPT FAILED.\nFeedback: ${errorContext}\n\nPrevious Code:\n${previousCode}\n\nFIX THE CODE. \n- Adjust coordinates, scale, or rotation based on the visual feedback. \n- ENSURE NO GAP between parts.`;
+    prompt += `\n\nPREVIOUS ATTEMPT FAILED.\nFeedback: ${errorContext}\n\nPrevious Code:\n${previousCode}\n\nFIX THE CODE. \n- Adjust coordinates, scale, or rotation based on the visual feedback. \n- ENSURE NO GAP between parts (Part is floating!). Move it closer to the center.`;
   }
 
   const parts: any[] = [
@@ -367,8 +370,8 @@ export const performAssemblyQC = async (
     3. **SCALE/ORIENT**: Scaled and oriented correctly.
     
     Fail criteria:
-    1. **FLOATING**: If the part is hovering near the model but not touching it, FAIL immediately.
-    2. **CLIPPING**: If hidden inside.
+    1. **FLOATING**: If the part is hovering near the model but not touching it (visible background color between part and body), FAIL immediately with score 0.
+    2. **CLIPPING**: If hidden completely inside.
     3. **SCALE**: If scale is wrong.
     
     Return JSON.
@@ -378,7 +381,7 @@ export const performAssemblyQC = async (
     type: Type.OBJECT,
     properties: {
       passed: { type: Type.BOOLEAN },
-      feedback: { type: Type.STRING, description: "Specific feedback on how to fix the specific part (e.g. 'Move wheel down 2 units', 'Scale turret up 2x')." },
+      feedback: { type: Type.STRING, description: "Specific feedback. If floating, say 'Part is floating above/beside the model. Move it X units closer.'" },
       score: { type: Type.INTEGER }
     },
     required: ["passed", "feedback", "score"]
