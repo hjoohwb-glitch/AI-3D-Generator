@@ -20,9 +20,9 @@ const IconLock = () => <svg className="w-4 h-4" fill="none" stroke="currentColor
 const IconUnlock = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>;
 
 const MODELS = [
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', dailyLimit: 10 }, // 10 uses daily
-  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', dailyLimit: 3 },
-  { id: 'gemini-3-pro-preview', name: 'Gemini 3.0 Pro (Preview)', dailyLimit: 1 },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', dailyLimit: 10, desc: 'Fast & simple' },
+  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', dailyLimit: 3, desc: 'Higher quality' },
+  { id: 'gemini-3-pro-preview', name: 'Gemini 3.0 Pro (Preview)', dailyLimit: 1, desc: 'Highest quality & slow' },
 ];
 
 export default function App() {
@@ -589,9 +589,10 @@ export default function App() {
                           onChange={() => setSelectedModelId(model.id)}
                           disabled={isLimitReached}
                         />
-                        <div className={`w-3 h-3 rounded-full border ${selectedModelId === model.id ? 'bg-blue-500 border-blue-500' : 'border-gray-600'}`}></div>
+                        <div className={`w-3 h-3 rounded-full border flex-shrink-0 ${selectedModelId === model.id ? 'bg-blue-500 border-blue-500' : 'border-gray-600'}`}></div>
                         <div className="flex-1">
                           <div className="text-sm font-medium text-gray-200">{model.name}</div>
+                          <div className="text-[10px] text-gray-400 mb-1">{model.desc}</div>
                           <div className="text-[10px] text-gray-500 flex justify-between">
                              <span>Daily Usage:</span>
                              <span className={`${isLimitReached ? 'text-red-400' : 'text-gray-400'}`}>
